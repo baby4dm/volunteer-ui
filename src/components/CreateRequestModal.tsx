@@ -241,7 +241,7 @@ export const CreateRequestModal = ({ open, onClose, onSuccess }: Props) => {
               fullWidth
               required
               InputLabelProps={{ shrink: true }}
-              inputProps={{ min: new Date().toISOString().split("T")[0] }} // Не можна вибрати минуле
+              inputProps={{ min: new Date().toISOString().split("T")[0] }}
               value={formData.validUntil}
               onChange={handleChange}
               error={!!errors.validUntil}

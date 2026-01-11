@@ -5,8 +5,11 @@ import type {
   HelpRequestPreviewResponse,
   HelpRequestFilter,
   Page,
-  FulfillmentProposal,
+  FulfillmentResponse,
   HelpRequestResponse,
+  FulfillmentRequestDto,
+  FulfillmentFilter,
+  VolunteerContributionResponse,
 } from "../types";
 
 export const requestsApi = {
@@ -38,18 +41,52 @@ export const requestsApi = {
     await api.delete(`/requests/${id}`);
   },
 
-  getMyProposals: async () => {
-    const response = await api.get<FulfillmentProposal[]>(
-      "/fulfillments/incoming"
+  getMyProposals: async (page = 0, size = 10) => {
+    const response = await api.get<Page<FulfillmentResponse>>(
+      "/fulfillments/incoming",
+      {
+        params: { page, size, sort: "createdAt,desc" },
+      }
     );
     return response.data;
   },
 
   approveProposal: async (fulfillmentId: number) => {
-    await api.post(`/fulfillments/${fulfillmentId}/approve`);
+    await api.patch(`/fulfillments/${fulfillmentId}/approve`);
   },
 
   rejectProposal: async (fulfillmentId: number) => {
-    await api.post(`/fulfillments/${fulfillmentId}/reject`);
+    await api.patch(`/fulfillments/${fulfillmentId}/reject`);
+  },
+  getAllRequests: async (filter: HelpRequestFilter, page = 0, size = 10) => {
+    const response = await api.get<Page<HelpRequestPreviewResponse>>(
+      "/requests",
+      {
+        params: {
+          ...filter,
+          page,
+          size,
+          sort: "createdAt,desc",
+        },
+      }
+    );
+    return response.data;
+  },
+  createOffer: async (requestId: number, data: FulfillmentRequestDto) => {
+    await api.post(`/fulfillments/requests/${requestId}`, data);
+  },
+  getMyContributions: async (filter: FulfillmentFilter, page = 0) => {
+    const response = await api.get<Page<VolunteerContributionResponse>>(
+      "/fulfillments/contributions",
+      {
+        params: {
+          ...filter,
+          page,
+          size: 10,
+          sort: "createdAt,desc",
+        },
+      }
+    );
+    return response.data;
   },
 };

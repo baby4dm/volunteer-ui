@@ -6,14 +6,9 @@ import {
   Tabs,
   Tab,
   TextField,
-  Card,
-  CardContent,
-  CardActions,
   Chip,
-  IconButton,
   CircularProgress,
   Pagination,
-  LinearProgress,
   Stack,
   Container,
   MenuItem,
@@ -21,31 +16,22 @@ import {
   Checkbox,
   Collapse,
   Paper,
-  CardActionArea,
-  alpha,
 } from "@mui/material";
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
-  LocationOn as LocationIcon,
   FilterList as FilterListIcon,
   Clear as ClearIcon,
   Search as SearchIcon,
-  PriorityHigh as PriorityIcon,
-  Category as CategoryIcon,
-  Event as DateIcon,
-  LocalShipping as ShippingIcon,
 } from "@mui/icons-material";
 
 import type {
   HelpRequestPreviewResponse,
   RequestStatus,
-  FulfillmentProposal,
   HelpRequestFilter,
+  FulfillmentResponse,
 } from "../types";
 
 import {
-  RequestStatusLabels,
   RequestPriorityLabels,
   HelpCategoryLabels,
   DeliveryTypeLabels,
@@ -55,192 +41,8 @@ import { requestsApi } from "../api/requestsApi";
 import { CreateRequestModal } from "../components/CreateRequestModal";
 import { RequestDetailsModal } from "../components/RequestDetailsModal";
 import { UKRAINE_REGIONS } from "../data/regions";
-
-const RequestCard = ({
-  req,
-  onDelete,
-  onClick,
-}: {
-  req: HelpRequestPreviewResponse;
-  onDelete: (id: number) => void;
-  onClick: (id: number) => void;
-}) => {
-  const currentAmount = req.receivedAmount || 0;
-  const percent =
-    req.amount > 0 ? Math.round((currentAmount / req.amount) * 100) : 0;
-  const displayPercent = Math.min(100, Math.max(0, percent));
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "CRITICAL":
-        return "error";
-      case "HIGH":
-        return "warning";
-      case "MEDIUM":
-        return "info";
-      default:
-        return "default";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return "success";
-      case "IN_PROGRESS":
-        return "warning";
-      case "CREATED":
-        return "primary";
-      case "CANCELED":
-        return "default";
-      default:
-        return "default";
-    }
-  };
-
-  return (
-    <Card
-      sx={{
-        width: "100%",
-        borderRadius: 2,
-        boxShadow: 1,
-        border: "1px solid #e0e0e0",
-        position: "relative",
-        transition: "0.2s",
-        "&:hover": { borderColor: "primary.main", boxShadow: 3 },
-      }}
-    >
-      <CardActionArea
-        onClick={() => onClick(req.id)}
-        sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          alignItems: "stretch",
-          height: "100%",
-        }}
-      >
-        <CardContent sx={{ flexGrow: 1, p: 2, width: "100%" }}>
-          <Box mb={1.5}>
-            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-              <Chip
-                icon={<PriorityIcon style={{ fontSize: 16 }} />}
-                label={RequestPriorityLabels[req.priority] || req.priority}
-                color={getPriorityColor(req.priority) as any}
-                size="small"
-                variant="filled"
-                sx={{ fontWeight: "bold", borderRadius: 1.5 }}
-              />
-
-              <Chip
-                label={RequestStatusLabels[req.status] || req.status}
-                color={getStatusColor(req.status) as any}
-                size="small"
-                variant="outlined"
-                sx={{ fontWeight: 500, border: "1px solid" }}
-              />
-
-              <Chip
-                icon={<CategoryIcon style={{ fontSize: 14, opacity: 0.7 }} />}
-                label={HelpCategoryLabels[req.category]}
-                size="small"
-                sx={{
-                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
-                  color: "primary.dark",
-                  fontWeight: 500,
-                  border: "none",
-                  "& .MuiChip-icon": { color: "primary.main" },
-                }}
-              />
-            </Box>
-          </Box>
-
-          <Typography variant="h6" fontWeight="bold" lineHeight={1.3} mb={1}>
-            {req.title}
-          </Typography>
-
-          <Box display="flex" flexWrap="wrap" gap={2} mb={2}>
-            <Box
-              display="flex"
-              alignItems="center"
-              gap={0.5}
-              color="text.secondary"
-            >
-              <LocationIcon fontSize="small" color="action" />
-              <Typography variant="caption" fontWeight={500}>
-                {req.settlement}, {req.region}
-              </Typography>
-            </Box>
-
-            <Box
-              display="flex"
-              alignItems="center"
-              gap={0.5}
-              color="text.secondary"
-            >
-              <ShippingIcon fontSize="small" color="action" />
-              <Typography variant="caption" fontWeight={500}>
-                {DeliveryTypeLabels[req.deliveryType] || "Не вказано"}
-              </Typography>
-            </Box>
-
-            <Box
-              display="flex"
-              alignItems="center"
-              gap={0.5}
-              color="text.secondary"
-            >
-              <DateIcon fontSize="small" color="action" />
-              <Typography variant="caption" fontWeight={500}>
-                До: {new Date(req.validUntil).toLocaleDateString()}
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box flexGrow={1} onClick={(e) => e.stopPropagation()}>
-            <Box display="flex" justifyContent="space-between" mb={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Зібрано: <b>{currentAmount}</b> / {req.amount}
-              </Typography>
-              <Typography
-                variant="caption"
-                fontWeight="bold"
-                color={displayPercent >= 100 ? "success.main" : "text.primary"}
-              >
-                {percent}%
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={displayPercent}
-              sx={{
-                height: 6,
-                borderRadius: 3,
-                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
-              }}
-              color={displayPercent >= 100 ? "success" : "primary"}
-            />
-          </Box>
-        </CardContent>
-      </CardActionArea>
-
-      <CardActions sx={{ position: "absolute", right: 0, top: 0, p: 1 }}>
-        <IconButton
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(req.id);
-          }}
-          sx={{
-            color: "text.disabled",
-            "&:hover": { color: "error.main", bgcolor: "error.lighter" },
-          }}
-        >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
-      </CardActions>
-    </Card>
-  );
-};
+import { ProposalCard } from "../components/ProposalCard";
+import { RequestCard } from "../components/RequestCard";
 
 export const MyRequestsPage = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -253,7 +55,7 @@ export const MyRequestsPage = () => {
 
   const [showFilters, setShowFilters] = useState(false);
   const [requests, setRequests] = useState<HelpRequestPreviewResponse[]>([]);
-  const [proposals, setProposals] = useState<FulfillmentProposal[]>([]);
+  const [proposals, setProposals] = useState<FulfillmentResponse[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -286,6 +88,27 @@ export const MyRequestsPage = () => {
     setPage(1);
   };
 
+  const handleApproveProposal = async (id: number) => {
+    try {
+      await requestsApi.approveProposal(id);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      alert("Помилка при підтвердженні");
+    }
+  };
+
+  const handleRejectProposal = async (id: number) => {
+    if (!window.confirm("Ви точно хочете відхилити цю допомогу?")) return;
+    try {
+      await requestsApi.rejectProposal(id);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      alert("Помилка при відхиленні");
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -309,8 +132,9 @@ export const MyRequestsPage = () => {
         setRequests(data.content);
         setTotalPages(data.totalPages);
       } else {
-        const data = await requestsApi.getMyProposals();
-        setProposals(data);
+        const data = await requestsApi.getMyProposals(page - 1);
+        setProposals(data.content);
+        setTotalPages(data.totalPages);
       }
     } catch (err) {
       console.error(err);
@@ -561,6 +385,23 @@ export const MyRequestsPage = () => {
               Записів не знайдено
             </Typography>
           )}
+
+          {tabValue === 2 &&
+            (proposals.length === 0 ? (
+              <Typography textAlign="center" color="text.secondary" mt={4}>
+                Немає нових пропозицій
+              </Typography>
+            ) : (
+              proposals.map((prop) => (
+                <ProposalCard
+                  key={prop.id}
+                  prop={prop}
+                  onApprove={handleApproveProposal}
+                  onReject={handleRejectProposal}
+                  onRequestClick={handleOpenDetails}
+                />
+              ))
+            ))}
 
           {totalPages > 1 && (
             <Box display="flex" justifyContent="center" mt={2}>

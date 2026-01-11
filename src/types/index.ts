@@ -165,10 +165,27 @@ export interface Page<T> {
 export interface FulfillmentProposal {
   id: number;
   requestId: number;
-  requestTitle: string; // Назва запиту, щоб розуміти, на що відгукнулись
-  volunteer: User; // Хто хоче допомогти
-  status: FulfillmentStatus; // PENDING, APPROVED, REJECTED
-  message: string; // Повідомлення від волонтера ("Можу привезти завтра...")
+  requestTitle: string;
+  volunteer: User;
+  status: FulfillmentStatus;
+  message: string;
+  createdAt: string;
+}
+export interface FulfillmentResponse {
+  id: number;
+
+  requestId: number;
+  requestTitle: string;
+
+  volunteerId: number;
+  volunteerName: string;
+  volunteerPhone: string;
+
+  amount: number;
+  deliveryType: DeliveryType;
+  comment: string;
+
+  status: FulfillmentStatus;
   createdAt: string;
 }
 export interface HelpRequestResponse {
@@ -180,12 +197,35 @@ export interface HelpRequestResponse {
   settlement: string;
   deliveryType: DeliveryType;
   contactPhone: string;
-  authorName: string; // <-- Нове поле
+  authorName: string;
   amount: number;
-  receivedAmount: number; // <-- Нове поле (може бути null, тому перевіримо)
-  validUntil: string; // LocalDate приходить як рядок "2024-03-20"
-  photoUrl?: string; // <-- Нове поле
+  receivedAmount: number;
+  validUntil: string;
+  photoUrl?: string;
   priority: RequestPriority;
   status: RequestStatus;
-  createdAt: string; // LocalDateTime приходить як рядок
+  createdAt: string;
+}
+export interface FulfillmentRequestDto {
+  amount: number;
+  deliveryType: DeliveryType;
+  comment?: string;
+}
+export interface VolunteerContributionResponse {
+  fulfillmentId: number;
+  title: string;
+  category: HelpCategory;
+
+  region: string;
+  settlement: string;
+
+  priority: RequestPriority;
+
+  contributionAmount: number;
+  status: FulfillmentStatus;
+
+  createdAt: string;
+}
+export interface FulfillmentFilter {
+  status?: FulfillmentStatus;
 }

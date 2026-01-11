@@ -5,16 +5,8 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
-// 👇 1. Імпортуємо реальну сторінку (переконайтеся, що файл src/pages/MyRequestsPage.tsx існує)
 import { MyRequestsPage } from "./pages/MyRequestsPage";
-
-// --- ТИМЧАСОВІ ЗАГЛУШКИ (MyRequestsPage звідси ми прибрали) ---
-const FeedPage = () => (
-  <div className="p-4">
-    <h1 className="text-2xl font-bold mb-4">Стрічка допомоги 🤝</h1>
-    <p>Тут буде список запитів від інших людей.</p>
-  </div>
-);
+import { HelpOthersPage } from "./pages/HelpOthersPage";
 
 const DeliveryPage = () => (
   <div className="p-4">
@@ -22,7 +14,6 @@ const DeliveryPage = () => (
     <p>Розділ для водіїв та кур'єрів.</p>
   </div>
 );
-// ----------------------------------------
 
 function App() {
   return (
@@ -36,8 +27,7 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/feed" replace />} />
 
-          <Route path="/feed" element={<FeedPage />} />
-          {/* 👇 2. Тепер тут використовується реальний компонент */}
+          <Route path="/feed" element={<HelpOthersPage />} />
           <Route path="/my-requests" element={<MyRequestsPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
