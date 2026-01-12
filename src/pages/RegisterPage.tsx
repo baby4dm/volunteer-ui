@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import {
   TextField,
   Button,
@@ -16,7 +17,7 @@ const BACKGROUND_IMAGE_URL =
 export const RegisterPage = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
-
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -55,10 +56,14 @@ export const RegisterPage = () => {
         region: formData.region,
         settlement: formData.settlement,
       });
-      navigate("/");
+      showToast("Реєстрація успішна! Увійдіть у свій акаунт.", "success");
+      navigate("/login");
     } catch (err: any) {
       console.error(err);
-      setError("Помилка реєстрації. Перевірте дані або спробуйте іншу пошту.");
+      showToast(
+        "Помилка реєстрації. Перевірте дані або спробуйте іншу пошту.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }

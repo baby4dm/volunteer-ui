@@ -26,6 +26,7 @@ import type {
   HelpRequestFilter,
   VolunteerContributionResponse,
   FulfillmentFilter,
+  DeliveryType,
 } from "../types";
 
 import {
@@ -54,7 +55,12 @@ export const HelpOthersPage = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
-  const [proposalModalId, setProposalModalId] = useState<number | null>(null);
+  const [proposalModalData, setProposalModalData] = useState<{
+    id: number;
+    title: string;
+    maxAmount: number;
+    deliveryType: DeliveryType;
+  } | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
@@ -328,7 +334,14 @@ export const HelpOthersPage = () => {
                 key={req.id}
                 req={req}
                 onClick={setDetailsId}
-                onHelp={setProposalModalId}
+                onHelp={() =>
+                  setProposalModalData({
+                    id: req.id,
+                    title: req.title,
+                    maxAmount: req.amount - (req.receivedAmount || 0),
+                    deliveryType: req.deliveryType,
+                  })
+                }
               />
             ))
           ) : (
@@ -351,8 +364,11 @@ export const HelpOthersPage = () => {
       )}
 
       <CreateProposalModal
-        requestId={proposalModalId}
-        onClose={() => setProposalModalId(null)}
+        requestId={proposalModalData?.id || null}
+        requestTitle={proposalModalData?.title}
+        maxAmount={proposalModalData?.maxAmount}
+        requestDeliveryType={proposalModalData?.deliveryType}
+        onClose={() => setProposalModalData(null)}
         onSuccess={fetchData}
       />
       <RequestDetailsModal

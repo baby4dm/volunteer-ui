@@ -209,7 +209,10 @@ export interface HelpRequestResponse {
 export interface FulfillmentRequestDto {
   amount: number;
   deliveryType: DeliveryType;
-  comment?: string;
+  comment: string;
+  region: string;
+  settlement: string;
+  needsCourier: boolean;
 }
 export interface VolunteerContributionResponse {
   fulfillmentId: number;

@@ -18,14 +18,12 @@ const DeliveryPage = () => (
 function App() {
   return (
     <Routes>
-      {/* ПУБЛІЧНІ МАРШРУТИ */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* ПРИВАТНІ МАРШРУТИ */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/feed" replace />} />
+          <Route path="/" element={<Navigate to="/my-requests" replace />} />
 
           <Route path="/feed" element={<HelpOthersPage />} />
           <Route path="/my-requests" element={<MyRequestsPage />} />
