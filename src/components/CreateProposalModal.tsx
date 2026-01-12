@@ -6,8 +6,6 @@ import {
   DialogActions,
   TextField,
   Button,
-  CircularProgress,
-  MenuItem,
   Box,
   Typography,
   Checkbox,
@@ -16,15 +14,15 @@ import {
   RadioGroup,
   Radio,
   FormControl,
-  FormLabel,
   Alert,
+  Grid,
+  InputAdornment,
+  CircularProgress,
 } from "@mui/material";
 import {
   LocalShipping as ShippingIcon,
   Inventory as AmountIcon,
-  Message as MessageIcon,
   LocationOn as LocationIcon,
-  DirectionsCar as CarIcon,
 } from "@mui/icons-material";
 
 import { requestsApi } from "../api/requestsApi";
@@ -40,51 +38,73 @@ interface Props {
   requestId: number | null;
   requestTitle?: string;
   maxAmount?: number;
-  requestDeliveryType?: DeliveryType; // 👈 Тип доставки з ЗАПИТУ
+  requestDeliveryType?: DeliveryType;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 const INITIAL_DATA: FulfillmentRequestDto = {
   amount: 1,
-  deliveryType: "" as DeliveryType,
   comment: "",
   region: "",
   settlement: "",
-  needsCourier: false, // 👈 За замовчуванням кур'єр не треба
+  needsCourier: false,
+};
+
+interface DeliveryData {
+  weight: string;
+  length: string;
+  width: string;
+  height: string;
+  description: string;
+}
+
+const INITIAL_DELIVERY_DATA: DeliveryData = {
+  weight: "",
+  length: "",
+  width: "",
+  height: "",
+  description: "",
 };
 
 export const CreateProposalModal = ({
   requestId,
   requestTitle,
   maxAmount,
-  requestDeliveryType, // Отримуємо тип доставки запиту
+  requestDeliveryType,
   onClose,
   onSuccess,
 }: Props) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  const [step, setStep] = useState<1 | 2>(1);
+  const [createdFulfillmentId, setCreatedFulfillmentId] = useState<
+    number | null
+  >(null);
+
   const [formData, setFormData] = useState<FulfillmentRequestDto>(INITIAL_DATA);
+  const [deliveryData, setDeliveryData] = useState<DeliveryData>(
+    INITIAL_DELIVERY_DATA
+  );
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [useMyAddress, setUseMyAddress] = useState(false);
 
-  // Ініціалізація форми при відкритті
   useEffect(() => {
     if (requestId && requestDeliveryType) {
       setFormData({
         ...INITIAL_DATA,
-        // Якщо Самовивіз або Пошта - ми форсуємо цей тип доставки
-        deliveryType: requestDeliveryType,
-        // Якщо "Доставка волонтером" (VOLUNTEER_DELIVERY), теж ставимо його,
-        // але далі дамо вибір: "Я сам" чи "Треба водій"
         needsCourier: false,
       });
+      setDeliveryData(INITIAL_DELIVERY_DATA);
       setErrors({});
       setUseMyAddress(false);
+      setStep(1);
+      setCreatedFulfillmentId(null);
     }
   }, [requestId, requestDeliveryType]);
 
-  // Автозаповнення адреси
   useEffect(() => {
     if (useMyAddress && user) {
       setFormData((prev) => ({
@@ -95,34 +115,68 @@ export const CreateProposalModal = ({
     }
   }, [useMyAddress, user]);
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+    if (name === "region" || name === "settlement") setUseMyAddress(false);
+  };
 
-    if (!formData.amount || formData.amount < 1) {
-      newErrors.amount = "Кількість має бути більше 0";
-    }
-    if (maxAmount !== undefined && formData.amount > maxAmount) {
-      newErrors.amount = `Максимум можна надати: ${maxAmount}`;
-    }
-    if (!formData.deliveryType) {
-      newErrors.deliveryType = "Оберіть спосіб доставки";
-    }
+  const handleDeliveryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setDeliveryData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleCourierChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const needs = event.target.value === "courier";
+    setFormData((prev) => ({ ...prev, needsCourier: needs }));
+  };
+
+  const validateStep1 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.amount || formData.amount < 1)
+      newErrors.amount = "Вкажіть кількість";
+    if (maxAmount !== undefined && formData.amount > maxAmount)
+      newErrors.amount = `Максимум: ${maxAmount}`;
     if (!formData.region) newErrors.region = "Вкажіть область";
-    if (!formData.settlement) newErrors.settlement = "Вкажіть населений пункт";
+    if (!formData.settlement) newErrors.settlement = "Вкажіть місто";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const validateStep2 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!deliveryData.weight || Number(deliveryData.weight) <= 0)
+      newErrors.weight = "Вкажіть вагу (> 0)";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleStep1Submit = async () => {
     if (!requestId) return;
-    if (!validate()) return;
+    if (!validateStep1()) return;
 
     setLoading(true);
     try {
-      await requestsApi.createOffer(requestId, formData);
-      onSuccess();
-      onClose();
+      const response = await requestsApi.createOffer(requestId, formData);
+
+      if (!formData.needsCourier) {
+        onSuccess();
+        onClose();
+        return;
+      }
+
+      if (response && response.id) {
+        setCreatedFulfillmentId(response.id);
+        setStep(2);
+      } else {
+        alert("Помилка: не вдалося отримати ID заявки. Спробуйте ще раз.");
+        onSuccess();
+        onClose();
+      }
     } catch (error) {
       console.error(error);
       alert("Помилка створення пропозиції");
@@ -131,30 +185,57 @@ export const CreateProposalModal = ({
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-    if (name === "region" || name === "settlement") setUseMyAddress(false);
-  };
+  const handleStep2Submit = async () => {
+    if (!createdFulfillmentId) return;
+    if (!validateStep2()) return;
 
-  // Логіка перемикача "Хто везе" для VOLUNTEER_DELIVERY
-  const handleCourierChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const needs = event.target.value === "courier";
-    setFormData((prev) => ({ ...prev, needsCourier: needs }));
+    setLoading(true);
+    try {
+      const payload = {
+        fulfillmentId: createdFulfillmentId,
+        weight: Number(deliveryData.weight),
+        length: deliveryData.length ? Number(deliveryData.length) : null,
+        width: deliveryData.width ? Number(deliveryData.width) : null,
+        height: deliveryData.height ? Number(deliveryData.height) : null,
+        description: deliveryData.description,
+      };
+
+      await requestsApi.createDeliveryRequest(payload);
+
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert(
+        "Помилка створення запиту на доставку. Пропозицію створено, але без деталей доставки."
+      );
+      onSuccess();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Dialog open={!!requestId} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ borderBottom: "1px solid #eee" }}>
-        <Typography variant="h6" fontWeight="bold">
-          Допомогти із запитом 🤝
-        </Typography>
-        {requestTitle && (
-          <Typography variant="body2" color="text.secondary">
-            {requestTitle} {maxAmount && `(Потрібно: ${maxAmount})`}
-          </Typography>
-        )}
+        <Box display="flex" alignItems="center" gap={1}>
+          {step === 2 && (
+            <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+              Крок 2/2
+            </Typography>
+          )}
+          <Box>
+            <Typography variant="h6" fontWeight="bold">
+              {step === 1 ? "Допомогти із запитом 🤝" : "Деталі для водія 🚚"}
+            </Typography>
+            {step === 1 && requestTitle && (
+              <Typography variant="body2" color="text.secondary">
+                {requestTitle} {maxAmount && `(Потрібно: ${maxAmount})`}
+              </Typography>
+            )}
+          </Box>
+        </Box>
       </DialogTitle>
 
       <DialogContent sx={{ pt: 3 }}>
@@ -165,191 +246,278 @@ export const CreateProposalModal = ({
           gap={3}
           mt={1}
         >
-          {/* Локація (Тут все без змін) */}
-          <Box>
-            <Box
-              display="flex"
-              alignItems="center"
-              justifyContent="space-between"
-              mb={1}
-            >
-              <Box display="flex" alignItems="center" gap={1}>
-                <LocationIcon color="action" fontSize="small" />
-                <Typography variant="subtitle2">Звідки забирати?</Typography>
-              </Box>
-              {user && (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={useMyAddress}
-                      onChange={(e) => setUseMyAddress(e.target.checked)}
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Typography variant="caption">
-                      Використати мою адресу
+          {step === 1 && (
+            <>
+              <Box>
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  mb={1}
+                >
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <LocationIcon color="action" fontSize="small" />
+                    <Typography variant="subtitle2">
+                      Звідки забирати?
                     </Typography>
-                  }
-                />
-              )}
-            </Box>
-            <Box
-              display="flex"
-              gap={2}
-              flexDirection={{ xs: "column", sm: "row" }}
-            >
-              <Autocomplete
-                fullWidth
-                size="small"
-                options={UKRAINE_REGIONS}
-                value={formData.region || null}
-                onChange={(_, v) => {
-                  setFormData((p) => ({ ...p, region: v || "" }));
-                  setUseMyAddress(false);
-                }}
-                renderInput={(p) => (
-                  <TextField
-                    {...p}
-                    label="Область"
-                    error={!!errors.region}
-                    helperText={errors.region}
+                  </Box>
+                  {user && (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={useMyAddress}
+                          onChange={(e) => setUseMyAddress(e.target.checked)}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="caption">
+                          Використати мою адресу
+                        </Typography>
+                      }
+                    />
+                  )}
+                </Box>
+                <Box
+                  display="flex"
+                  gap={2}
+                  flexDirection={{ xs: "column", sm: "row" }}
+                >
+                  <Autocomplete
+                    fullWidth
+                    size="small"
+                    options={UKRAINE_REGIONS}
+                    value={formData.region || null}
+                    onChange={(_, v) => {
+                      setFormData((p) => ({ ...p, region: v || "" }));
+                      setUseMyAddress(false);
+                    }}
+                    renderInput={(p) => (
+                      <TextField
+                        {...p}
+                        label="Область"
+                        error={!!errors.region}
+                        helperText={errors.region}
+                      />
+                    )}
                   />
-                )}
-              />
-              <TextField
-                label="Місто"
-                name="settlement"
-                fullWidth
-                size="small"
-                value={formData.settlement}
-                onChange={handleChange}
-                error={!!errors.settlement}
-              />
-            </Box>
-          </Box>
+                  <TextField
+                    label="Місто"
+                    name="settlement"
+                    fullWidth
+                    size="small"
+                    value={formData.settlement}
+                    onChange={handleChange}
+                    error={!!errors.settlement}
+                  />
+                </Box>
+              </Box>
 
-          {/* Кількість */}
-          <Box>
-            <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <AmountIcon color="action" fontSize="small" />
-              <Typography variant="subtitle2">Кількість</Typography>
-            </Box>
-            <TextField
-              name="amount"
-              type="number"
-              fullWidth
-              size="small"
-              value={formData.amount}
-              onChange={handleChange}
-              error={!!errors.amount}
-              helperText={errors.amount}
-              InputProps={{ inputProps: { min: 1, max: maxAmount } }}
-            />
-          </Box>
-
-          {/* 🔥 ЛОГІКА ДОСТАВКИ 🔥 */}
-          <Box>
-            <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <ShippingIcon color="action" fontSize="small" />
-              <Typography variant="subtitle2">Логістика</Typography>
-            </Box>
-
-            {/* ВАРІАНТ 1: Самовивіз або Пошта (жорстко задано) */}
-            {(requestDeliveryType === "SELF_PICKUP" ||
-              requestDeliveryType === "POSTAL_DELIVERY") && (
-              <>
+              <Box>
+                <Box display="flex" alignItems="center" gap={1} mb={1}>
+                  <AmountIcon color="action" fontSize="small" />
+                  <Typography variant="subtitle2">Кількість</Typography>
+                </Box>
                 <TextField
-                  disabled
+                  name="amount"
+                  type="number"
                   fullWidth
                   size="small"
-                  value={DeliveryTypeLabels[requestDeliveryType]}
-                  helperText={
-                    requestDeliveryType === "SELF_PICKUP"
-                      ? "Реципієнт забере допомогу самостійно за вашою адресою."
-                      : "Ви маєте відправити допомогу поштою."
-                  }
+                  value={formData.amount}
+                  onChange={handleChange}
+                  error={!!errors.amount}
+                  helperText={errors.amount}
+                  InputProps={{ inputProps: { min: 1, max: maxAmount } }}
                 />
-              </>
-            )}
+              </Box>
 
-            {/* ВАРІАНТ 2: Потрібна доставка волонтером */}
-            {requestDeliveryType === "VOLUNTEER_DELIVERY" && (
-              <Box
-                p={2}
-                border="1px solid #e0e0e0"
-                borderRadius={1}
-                bgcolor="#fafafa"
-              >
-                <Typography variant="body2" fontWeight="bold" mb={1}>
-                  Запиту потрібна доставка. Ваші дії?
-                </Typography>
+              <Box>
+                <Box display="flex" alignItems="center" gap={1} mb={1}>
+                  <ShippingIcon color="action" fontSize="small" />
+                  <Typography variant="subtitle2">Логістика</Typography>
+                </Box>
 
-                <FormControl component="fieldset">
-                  <RadioGroup
-                    value={formData.needsCourier ? "courier" : "self"}
-                    onChange={handleCourierChange}
+                {(requestDeliveryType === "SELF_PICKUP" ||
+                  requestDeliveryType === "POSTAL_DELIVERY") && (
+                  <TextField
+                    disabled
+                    fullWidth
+                    size="small"
+                    value={DeliveryTypeLabels[requestDeliveryType]}
+                    helperText="Спосіб доставки визначено реципієнтом."
+                  />
+                )}
+
+                {requestDeliveryType === "VOLUNTEER_DELIVERY" && (
+                  <Box
+                    p={2}
+                    border="1px solid #e0e0e0"
+                    borderRadius={1}
+                    bgcolor="#fafafa"
                   >
-                    <FormControlLabel
-                      value="self"
-                      control={<Radio size="small" />}
-                      label={
-                        <Box>
-                          <Typography variant="body2" fontWeight="500">
-                            Я можу доставити сам 🚗
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Ви привезете річ реципієнту
-                          </Typography>
-                        </Box>
-                      }
-                      sx={{ mb: 1 }}
-                    />
-                    <FormControlLabel
-                      value="courier"
-                      control={<Radio size="small" />}
-                      label={
-                        <Box>
-                          <Typography variant="body2" fontWeight="500">
-                            Не маю змоги доставити 📦
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Система створить запит на пошук водія
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </RadioGroup>
-                </FormControl>
+                    <Typography variant="body2" fontWeight="bold" mb={1}>
+                      Як передамо речі?
+                    </Typography>
+                    <FormControl component="fieldset">
+                      <RadioGroup
+                        value={formData.needsCourier ? "courier" : "self"}
+                        onChange={handleCourierChange}
+                      >
+                        <FormControlLabel
+                          value="self"
+                          control={<Radio size="small" />}
+                          label="Я можу доставити сам 🚗"
+                        />
+                        <FormControlLabel
+                          value="courier"
+                          control={<Radio size="small" />}
+                          label="Мені потрібен водій 📦"
+                        />
+                      </RadioGroup>
+                    </FormControl>
 
-                {formData.needsCourier && (
-                  <Alert severity="info" sx={{ mt: 2, py: 0 }}>
-                    Буде створено запит у вкладці "Доставка" для пошуку
-                    автоволонтера.
-                  </Alert>
+                    {formData.needsCourier && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        Натисніть "Далі", щоб вказати параметри вантажу для
+                        водія.
+                      </Alert>
+                    )}
+                  </Box>
                 )}
               </Box>
-            )}
-          </Box>
 
-          <TextField
-            name="comment"
-            fullWidth
-            multiline
-            rows={2}
-            placeholder="Коментар..."
-            value={formData.comment}
-            onChange={handleChange}
-          />
+              <TextField
+                name="comment"
+                fullWidth
+                multiline
+                rows={2}
+                placeholder="Коментар до заявки..."
+                value={formData.comment}
+                onChange={handleChange}
+              />
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <Alert severity="success" sx={{ mb: 1 }}>
+                Пропозицію створено! Тепер вкажіть деталі для пошуку водія.
+              </Alert>
+
+              <Box>
+                <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+                  Фізичні параметри
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      label="Вага"
+                      name="weight"
+                      type="number"
+                      size="small"
+                      fullWidth
+                      autoFocus
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">кг</InputAdornment>
+                        ),
+                      }}
+                      value={deliveryData.weight}
+                      onChange={handleDeliveryChange}
+                      error={!!errors.weight}
+                      helperText={errors.weight}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      label="Довжина"
+                      name="length"
+                      type="number"
+                      size="small"
+                      fullWidth
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">см</InputAdornment>
+                        ),
+                      }}
+                      value={deliveryData.length}
+                      onChange={handleDeliveryChange}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      label="Ширина"
+                      name="width"
+                      type="number"
+                      size="small"
+                      fullWidth
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">см</InputAdornment>
+                        ),
+                      }}
+                      value={deliveryData.width}
+                      onChange={handleDeliveryChange}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      label="Висота"
+                      name="height"
+                      type="number"
+                      size="small"
+                      fullWidth
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">см</InputAdornment>
+                        ),
+                      }}
+                      value={deliveryData.height}
+                      onChange={handleDeliveryChange}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+                  Опис вантажу
+                </Typography>
+                <TextField
+                  name="description"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  placeholder="Наприклад: Крихке, скло, потрібен порожній багажник..."
+                  value={deliveryData.description}
+                  onChange={handleDeliveryChange}
+                  helperText="Водій побачить це в деталях замовлення"
+                />
+              </Box>
+            </>
+          )}
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} color="inherit">
-          Скасувати
-        </Button>
-        <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-          {loading ? "..." : "Надіслати"}
+        {step === 1 && (
+          <Button onClick={onClose} color="inherit" disabled={loading}>
+            Скасувати
+          </Button>
+        )}
+
+        <Button
+          onClick={step === 1 ? handleStep1Submit : handleStep2Submit}
+          variant="contained"
+          disabled={loading}
+        >
+          {loading ? (
+            <CircularProgress size={24} color="inherit" />
+          ) : step === 1 && formData.needsCourier ? (
+            "Далі"
+          ) : (
+            "Надіслати"
+          )}
         </Button>
       </DialogActions>
     </Dialog>

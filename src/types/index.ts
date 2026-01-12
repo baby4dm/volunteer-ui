@@ -208,12 +208,12 @@ export interface HelpRequestResponse {
 }
 export interface FulfillmentRequestDto {
   amount: number;
-  deliveryType: DeliveryType;
   comment: string;
   region: string;
   settlement: string;
   needsCourier: boolean;
 }
+
 export interface VolunteerContributionResponse {
   fulfillmentId: number;
   title: string;
@@ -231,4 +231,12 @@ export interface VolunteerContributionResponse {
 }
 export interface FulfillmentFilter {
   status?: FulfillmentStatus;
+}
+export interface DeliveryCreationDto {
+  fulfillmentId: number;
+  weight: number;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  description: string;
 }

@@ -10,6 +10,7 @@ import type {
   FulfillmentRequestDto,
   FulfillmentFilter,
   VolunteerContributionResponse,
+  DeliveryCreationDto,
 } from "../types";
 
 export const requestsApi = {
@@ -73,7 +74,14 @@ export const requestsApi = {
     return response.data;
   },
   createOffer: async (requestId: number, data: FulfillmentRequestDto) => {
-    await api.post(`/fulfillments/requests/${requestId}`, data);
+    const response = await api.post<FulfillmentResponse>(
+      `/fulfillments/requests/${requestId}`,
+      data
+    );
+    return response.data;
+  },
+  createDeliveryRequest: async (data: DeliveryCreationDto) => {
+    await api.post("/deliveries", data);
   },
   getMyContributions: async (filter: FulfillmentFilter, page = 0) => {
     const response = await api.get<Page<VolunteerContributionResponse>>(
