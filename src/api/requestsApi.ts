@@ -11,6 +11,8 @@ import type {
   FulfillmentFilter,
   VolunteerContributionResponse,
   DeliveryCreationDto,
+  DeliveryFilter,
+  DeliveryPreviewResponse,
 } from "../types";
 
 export const requestsApi = {
@@ -96,5 +98,59 @@ export const requestsApi = {
       }
     );
     return response.data;
+  },
+  getAvailable: async (filter: DeliveryFilter, page = 0, size = 10) => {
+    const response = await api.get<Page<DeliveryPreviewResponse>>(
+      "/deliveries/available",
+      {
+        params: {
+          ...filter,
+          page,
+          size,
+          sort: "createdAt,desc",
+        },
+      }
+    );
+    return response.data;
+  },
+
+  getMyActive: async (filter: DeliveryFilter, page = 0, size = 10) => {
+    const response = await api.get<Page<DeliveryPreviewResponse>>(
+      "/deliveries/my",
+      {
+        params: {
+          ...filter,
+          status: "IN_PROGRESS",
+          page,
+          size,
+          sort: "createdAt,desc",
+        },
+      }
+    );
+    return response.data;
+  },
+
+  getMyArchive: async (filter: DeliveryFilter, page = 0, size = 10) => {
+    const response = await api.get<Page<DeliveryPreviewResponse>>(
+      "/deliveries/my",
+      {
+        params: {
+          ...filter,
+          status: "COMPLETED",
+          page,
+          size,
+          sort: "createdAt,desc",
+        },
+      }
+    );
+    return response.data;
+  },
+
+  takeDelivery: async (id: number) => {
+    await api.post(`/deliveries/${id}/take`);
+  },
+
+  completeDelivery: async (id: number) => {
+    await api.patch(`/deliveries/${id}/complete`);
   },
 };

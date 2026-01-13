@@ -7,13 +7,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 
 import { MyRequestsPage } from "./pages/MyRequestsPage";
 import { HelpOthersPage } from "./pages/HelpOthersPage";
-
-const DeliveryPage = () => (
-  <div className="p-4">
-    <h1 className="text-2xl font-bold mb-4">Доставка та логістика 🚚</h1>
-    <p>Розділ для водіїв та кур'єрів.</p>
-  </div>
-);
+import { DeliveriesPage } from "./pages/DeliveriesPage";
 
 function App() {
   return (
@@ -27,7 +21,9 @@ function App() {
 
           <Route path="/feed" element={<HelpOthersPage />} />
           <Route path="/my-requests" element={<MyRequestsPage />} />
-          <Route path="/delivery" element={<DeliveryPage />} />
+
+          <Route path="/delivery" element={<DeliveriesPage />} />
+
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>

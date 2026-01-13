@@ -56,11 +56,15 @@ export const VolunteerRequestCard = ({ req, onHelp, onClick }: Props) => {
     <Card
       sx={{
         width: "100%",
-        borderRadius: 2,
+        borderRadius: 3, // Закруглені кути як у новому стилі
         boxShadow: 1,
-        border: "1px solid #e0e0e0",
-        transition: "0.2s",
-        "&:hover": { borderColor: "primary.main", boxShadow: 3 },
+        border: "1px solid",
+        borderColor: "grey.200",
+        transition: "all 0.2s ease",
+        "&:hover": {
+          borderColor: "primary.main",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        },
       }}
     >
       <CardActionArea
@@ -71,8 +75,9 @@ export const VolunteerRequestCard = ({ req, onHelp, onClick }: Props) => {
           alignItems: "stretch",
         }}
       >
-        <CardContent sx={{ flexGrow: 1, p: 2 }}>
-          <Box mb={1.5} display="flex" gap={1} flexWrap="wrap">
+        <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
+          {/* Header Tags */}
+          <Box mb={2} display="flex" gap={1} flexWrap="wrap">
             <Chip
               icon={<PriorityIcon style={{ fontSize: 16 }} />}
               label={RequestPriorityLabels[req.priority]}
@@ -89,7 +94,8 @@ export const VolunteerRequestCard = ({ req, onHelp, onClick }: Props) => {
               sx={{
                 bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
                 color: "primary.dark",
-                fontWeight: 500,
+                fontWeight: 600,
+                borderRadius: 1.5,
               }}
             />
 
@@ -97,22 +103,24 @@ export const VolunteerRequestCard = ({ req, onHelp, onClick }: Props) => {
               label={RequestStatusLabels[req.status]}
               variant="outlined"
               size="small"
+              sx={{ borderRadius: 1.5, fontWeight: 500 }}
             />
           </Box>
 
-          <Typography variant="h6" fontWeight="bold" mb={1}>
+          <Typography variant="h6" fontWeight="bold" mb={1.5} lineHeight={1.3}>
             {req.title}
           </Typography>
 
-          <Box display="flex" flexWrap="wrap" gap={2} mb={2}>
+          {/* Info Row */}
+          <Box display="flex" flexWrap="wrap" gap={2} mb={2.5}>
             <Box
               display="flex"
               gap={0.5}
               alignItems="center"
               color="text.secondary"
             >
-              <LocationIcon fontSize="small" />{" "}
-              <Typography variant="caption">
+              <LocationIcon sx={{ fontSize: 16 }} />
+              <Typography variant="caption" fontWeight={500}>
                 {req.settlement}, {req.region}
               </Typography>
             </Box>
@@ -122,8 +130,8 @@ export const VolunteerRequestCard = ({ req, onHelp, onClick }: Props) => {
               alignItems="center"
               color="text.secondary"
             >
-              <ShippingIcon fontSize="small" />{" "}
-              <Typography variant="caption">
+              <ShippingIcon sx={{ fontSize: 16 }} />
+              <Typography variant="caption" fontWeight={500}>
                 {DeliveryTypeLabels[req.deliveryType] || "Не вказано"}
               </Typography>
             </Box>
@@ -133,44 +141,74 @@ export const VolunteerRequestCard = ({ req, onHelp, onClick }: Props) => {
               alignItems="center"
               color="text.secondary"
             >
-              <DateIcon fontSize="small" />{" "}
-              <Typography variant="caption">
+              <DateIcon sx={{ fontSize: 16 }} />
+              <Typography variant="caption" fontWeight={500}>
                 До: {new Date(req.validUntil).toLocaleDateString()}
               </Typography>
             </Box>
           </Box>
 
+          {/* Progress Bar */}
           <Box>
             <Box display="flex" justifyContent="space-between" mb={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Зібрано: {currentAmount} / {req.amount}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontWeight={500}
+              >
+                Зібрано: <b>{currentAmount}</b> з {req.amount}
               </Typography>
-              <Typography variant="caption" fontWeight="bold">
+              <Typography
+                variant="caption"
+                fontWeight="bold"
+                color="primary.main"
+              >
                 {percent}%
               </Typography>
             </Box>
             <LinearProgress
               variant="determinate"
               value={displayPercent}
-              sx={{ height: 6, borderRadius: 3 }}
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                bgcolor: "grey.100",
+                "& .MuiLinearProgress-bar": {
+                  borderRadius: 4,
+                },
+              }}
             />
           </Box>
         </CardContent>
       </CardActionArea>
 
+      {/* Action Button */}
       <CardActions
         sx={{
-          borderTop: "1px solid #f0f0f0",
-          p: 1,
+          borderTop: "1px solid",
+          borderColor: "grey.100",
+          p: 2,
           justifyContent: "flex-end",
         }}
       >
         <Button
           variant="contained"
           color="primary"
+          disableElevation
+          size="medium" // Збільшений розмір
           startIcon={<HandshakeIcon />}
           onClick={() => onHelp(req.id)}
           disabled={req.status !== "CREATED" && req.status !== "IN_PROGRESS"}
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            borderRadius: 2,
+            px: 3,
+            boxShadow: 2, // Легка тінь
+            "&:hover": {
+              boxShadow: 4,
+            },
+          }}
         >
           Допомогти
         </Button>

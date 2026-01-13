@@ -240,3 +240,24 @@ export interface DeliveryCreationDto {
   height: number | null;
   description: string;
 }
+export interface DeliveryPreviewResponse {
+  id: number;
+  fromRegion: string;
+  fromSettlement: string;
+  toRegion: string;
+  toSettlement: string;
+  weight: number;
+  length: number;
+  width: number;
+  height: number;
+  priority: RequestPriority;
+  validUntil: string;
+}
+
+export interface DeliveryFilter {
+  fromRegion?: string;
+  fromSettlement?: string;
+  toRegion?: string;
+  toSettlement?: string;
+  priority?: RequestPriority | "";
+}
