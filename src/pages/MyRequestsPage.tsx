@@ -26,7 +26,6 @@ import {
 
 import type {
   HelpRequestPreviewResponse,
-  RequestStatus,
   HelpRequestFilter,
   FulfillmentResponse,
 } from "../types";
@@ -43,8 +42,11 @@ import { RequestDetailsModal } from "../components/RequestDetailsModal";
 import { UKRAINE_REGIONS } from "../data/regions";
 import { ProposalCard } from "../components/ProposalCard";
 import { RequestCard } from "../components/RequestCard";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { useToast } from "../context/ToastContext";
 
 export const MyRequestsPage = () => {
+  const { showToast } = useToast();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -70,6 +72,31 @@ export const MyRequestsPage = () => {
     isUrgent: false,
   });
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    content?: string;
+    action: (() => Promise<void>) | null;
+  }>({
+    open: false,
+    title: "",
+    action: null,
+  });
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.action) return;
+    setActionLoading(true);
+    try {
+      await confirmDialog.action();
+      setConfirmDialog({ ...confirmDialog, open: false });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleFilterChange = (field: keyof HelpRequestFilter, value: any) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
     setPage(1);
@@ -86,38 +113,65 @@ export const MyRequestsPage = () => {
     });
     setSearchQuery("");
     setPage(1);
+    showToast("Фільтри скинуто", "info");
   };
 
   const handleApproveProposal = async (id: number) => {
     try {
       await requestsApi.approveProposal(id);
+      showToast("Пропозицію прийнято! 🎉", "success");
       fetchData();
     } catch (e) {
       console.error(e);
-      alert("Помилка при підтвердженні");
+      showToast("Помилка при підтвердженні", "error");
     }
   };
 
-  const handleRejectProposal = async (id: number) => {
-    if (!window.confirm("Ви точно хочете відхилити цю допомогу?")) return;
-    try {
-      await requestsApi.rejectProposal(id);
-      fetchData();
-    } catch (e) {
-      console.error(e);
-      alert("Помилка при відхиленні");
-    }
+  const handleRejectProposal = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      title: "Відхилити допомогу?",
+      content: "Ви впевнені? Це дію не можна скасувати.",
+      action: async () => {
+        await requestsApi.rejectProposal(id);
+        showToast("Пропозицію відхилено", "info");
+        fetchData();
+      },
+    });
+  };
+
+  const handleDeleteRequest = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      title: "Видалити запит?",
+      content: "Це безповоротна дія.",
+      action: async () => {
+        await requestsApi.delete(id);
+        showToast("Запит видалено", "success");
+        fetchData();
+      },
+    });
+  };
+
+  const handleManualComplete = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      title: "Завершити збір вручну?",
+      content:
+        "Статус зміниться на 'Виконано'. Ви впевнені, що хочете закрити збір?",
+      action: async () => {
+        await requestsApi.complete(id);
+        showToast("Збір успішно закрито! 🎉", "success");
+        fetchData();
+      },
+    });
   };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (tabValue === 0 || tabValue === 1) {
-        const statusFilter: RequestStatus =
-          tabValue === 0 ? "CREATED" : "COMPLETED";
-
-        const apiFilters: HelpRequestFilter = {
-          status: statusFilter,
+      if (tabValue === 0) {
+        const baseFilters = {
           ...(filters.category ? { category: filters.category } : {}),
           ...(filters.region ? { region: filters.region } : {}),
           ...(filters.settlement ? { settlement: filters.settlement } : {}),
@@ -128,19 +182,64 @@ export const MyRequestsPage = () => {
           ...(filters.isUrgent ? { isUrgent: true } : {}),
         };
 
+        const requestCreated = requestsApi.getMyRequests(
+          { ...baseFilters, status: "CREATED" as any },
+          page - 1
+        );
+
+        const requestInProgress = requestsApi.getMyRequests(
+          { ...baseFilters, status: "IN_PROGRESS" as any },
+          page - 1
+        );
+
+        const [dataCreated, dataInProgress] = await Promise.all([
+          requestCreated,
+          requestInProgress,
+        ]);
+
+        const combinedContent = [
+          ...dataCreated.content,
+          ...dataInProgress.content,
+        ];
+
+        setRequests(combinedContent);
+        setTotalPages(
+          Math.max(dataCreated.page.totalPages, dataInProgress.page.totalPages)
+        );
+      } else if (tabValue === 1) {
+        const apiFilters: HelpRequestFilter = {
+          status: "COMPLETED" as any,
+          ...(filters.category ? { category: filters.category } : {}),
+        };
+
         const data = await requestsApi.getMyRequests(apiFilters, page - 1);
         setRequests(data.content);
-        setTotalPages(data.totalPages);
+        setTotalPages(data.page.totalPages);
       } else {
         const data = await requestsApi.getMyProposals(page - 1);
         setProposals(data.content);
-        setTotalPages(data.totalPages);
+        setTotalPages(data.page.totalPages);
       }
     } catch (err) {
       console.error(err);
+      showToast("Не вдалося завантажити дані", "error");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCompleteFulfillment = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      title: "Підтвердити отримання?",
+      content:
+        "Натискайте це лише якщо ви фактично отримали допомогу від волонтера.",
+      action: async () => {
+        await requestsApi.completeFulfillment(id);
+        showToast("Допомогу отримано! Дякуємо! 🤝", "success");
+        fetchData();
+      },
+    });
   };
 
   useEffect(() => {
@@ -150,12 +249,6 @@ export const MyRequestsPage = () => {
   const displayRequests = requests.filter((req) =>
     req.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleDeleteRequest = async (id: number) => {
-    if (!window.confirm("Видалити?")) return;
-    await requestsApi.delete(id);
-    fetchData();
-  };
 
   const handleOpenDetails = (id: number) => setSelectedRequestId(id);
   const handleCloseDetails = () => setSelectedRequestId(null);
@@ -377,6 +470,7 @@ export const MyRequestsPage = () => {
                 req={req}
                 onDelete={handleDeleteRequest}
                 onClick={handleOpenDetails}
+                onComplete={handleManualComplete}
               />
             ))}
 
@@ -399,6 +493,7 @@ export const MyRequestsPage = () => {
                   onApprove={handleApproveProposal}
                   onReject={handleRejectProposal}
                   onRequestClick={handleOpenDetails}
+                  onComplete={handleCompleteFulfillment}
                 />
               ))
             ))}
@@ -428,6 +523,15 @@ export const MyRequestsPage = () => {
       <RequestDetailsModal
         requestId={selectedRequestId}
         onClose={handleCloseDetails}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        content={confirmDialog.content}
+        loading={actionLoading}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={handleConfirmAction}
       />
     </Container>
   );

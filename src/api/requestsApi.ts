@@ -116,7 +116,7 @@ export const requestsApi = {
 
   getMyActive: async (filter: DeliveryFilter, page = 0, size = 10) => {
     const response = await api.get<Page<DeliveryPreviewResponse>>(
-      "/deliveries/my",
+      "/deliveries/my-active",
       {
         params: {
           ...filter,
@@ -132,7 +132,7 @@ export const requestsApi = {
 
   getMyArchive: async (filter: DeliveryFilter, page = 0, size = 10) => {
     const response = await api.get<Page<DeliveryPreviewResponse>>(
-      "/deliveries/my",
+      "/deliveries/my-archive",
       {
         params: {
           ...filter,
@@ -152,5 +152,11 @@ export const requestsApi = {
 
   completeDelivery: async (id: number) => {
     await api.patch(`/deliveries/${id}/complete`);
+  },
+  completeFulfillment: async (id: number) => {
+    await api.patch(`/fulfillments/${id}/complete`);
+  },
+  complete: async (id: number) => {
+    await api.patch(`/requests/${id}/complete`);
   },
 };

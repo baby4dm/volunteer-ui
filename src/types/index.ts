@@ -69,7 +69,8 @@ export const RequestStatusLabels: Record<RequestStatus, string> = {
 
 export const FulfillmentStatus = {
   PENDING: "PENDING",
-  APPROVED: "APPROVED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
   REJECTED: "REJECTED",
   CANCELED: "CANCELED",
 } as const;
@@ -78,7 +79,8 @@ export type FulfillmentStatus =
 
 export const FulfillmentStatusLabels: Record<FulfillmentStatus, string> = {
   [FulfillmentStatus.PENDING]: "Очікує підтвердження",
-  [FulfillmentStatus.APPROVED]: "Прийнято",
+  [FulfillmentStatus.IN_PROGRESS]: "В роботі",
+  [FulfillmentStatus.COMPLETED]: "Виконана",
   [FulfillmentStatus.REJECTED]: "Відхилено",
   [FulfillmentStatus.CANCELED]: "Скасовано",
 };
@@ -157,10 +159,12 @@ export interface HelpRequestFilter {
 
 export interface Page<T> {
   content: T[];
-  totalPages: number;
-  totalElements: number;
-  size: number;
-  number: number;
+  page: {
+    size: number;
+    number: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 export interface FulfillmentProposal {
   id: number;

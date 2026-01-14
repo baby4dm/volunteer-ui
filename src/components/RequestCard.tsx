@@ -9,6 +9,7 @@ import {
   LinearProgress,
   CardActionArea,
   alpha,
+  Tooltip,
 } from "@mui/material";
 import {
   Delete as DeleteIcon,
@@ -17,6 +18,7 @@ import {
   Category as CategoryIcon,
   Event as DateIcon,
   LocalShipping as ShippingIcon,
+  CheckCircle as DoneIcon,
 } from "@mui/icons-material";
 
 import type { HelpRequestPreviewResponse } from "../types";
@@ -31,10 +33,11 @@ import {
 interface Props {
   req: HelpRequestPreviewResponse;
   onDelete: (id: number) => void;
+  onComplete?: (id: number) => void;
   onClick: (id: number) => void;
 }
 
-export const RequestCard = ({ req, onDelete, onClick }: Props) => {
+export const RequestCard = ({ req, onDelete, onComplete, onClick }: Props) => {
   const currentAmount = req.receivedAmount || 0;
   const percent =
     req.amount > 0 ? Math.round((currentAmount / req.amount) * 100) : 0;
@@ -67,6 +70,8 @@ export const RequestCard = ({ req, onDelete, onClick }: Props) => {
         return "default";
     }
   };
+
+  const isActive = req.status === "CREATED" || req.status === "IN_PROGRESS";
 
   return (
     <Card
@@ -193,20 +198,57 @@ export const RequestCard = ({ req, onDelete, onClick }: Props) => {
         </CardContent>
       </CardActionArea>
 
-      <CardActions sx={{ position: "absolute", right: 0, top: 0, p: 1 }}>
-        <IconButton
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(req.id);
-          }}
-          sx={{
-            color: "text.disabled",
-            "&:hover": { color: "error.main", bgcolor: "error.lighter" },
-          }}
-        >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+      <CardActions
+        sx={{
+          position: "absolute",
+          right: 0,
+          top: 0,
+          p: 1,
+          display: "flex",
+          gap: 0.5,
+          zIndex: 2,
+        }}
+      >
+        {isActive && onComplete && (
+          <Tooltip title="Завершити збір">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onComplete(req.id);
+              }}
+              sx={{
+                color: "success.main",
+                bgcolor: (theme) => alpha(theme.palette.success.main, 0.05),
+                border: "1px solid",
+                borderColor: "success.light",
+                "&:hover": {
+                  bgcolor: "success.main",
+                  color: "white",
+                  borderColor: "success.main",
+                },
+              }}
+            >
+              <DoneIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+
+        <Tooltip title="Видалити">
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(req.id);
+            }}
+            sx={{
+              color: "text.disabled",
+              "&:hover": { color: "error.main", bgcolor: "error.lighter" },
+            }}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </CardActions>
     </Card>
   );

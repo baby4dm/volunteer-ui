@@ -19,24 +19,23 @@ import {
   Clear as ClearIcon,
 } from "@mui/icons-material";
 
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { requestsApi } from "../api/requestsApi";
 import { DeliveryCard } from "../components/DeliveryCard";
 import { UKRAINE_REGIONS } from "../data/regions";
-import { useToast } from "../context/ToastContext"; // 👈 Імпортуємо хук
+import { useToast } from "../context/ToastContext";
 import { RequestPriorityLabels } from "../types";
 import type { DeliveryFilter, DeliveryPreviewResponse } from "../types";
 
 export const DeliveriesPage = () => {
-  const { showToast } = useToast(); // 👈 Дістаємо функцію показу повідомлень
+  const { showToast } = useToast();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<DeliveryPreviewResponse[]>([]);
-
-  // Пагінація
+  const [actionLoading, setActionLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
-  // Фільтри
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<DeliveryFilter>({
     fromRegion: "",
@@ -45,12 +44,21 @@ export const DeliveriesPage = () => {
     toSettlement: "",
     priority: "" as any,
   });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    content?: string;
+    action: (() => Promise<void>) | null;
+  }>({
+    open: false,
+    title: "",
+    action: null,
+  });
 
   const fetchData = async () => {
     setLoading(true);
     try {
       let data;
-      // Видаляємо пусті поля з фільтру перед відправкою
       const activeFilters = Object.fromEntries(
         Object.entries(filters).filter(([_, v]) => v !== "")
       );
@@ -63,10 +71,10 @@ export const DeliveriesPage = () => {
         data = await requestsApi.getMyArchive(activeFilters, page - 1);
       }
       setItems(data.content);
-      setTotalPages(data.totalPages);
+      setTotalPages(data.page.totalPages);
     } catch (e) {
       console.error(e);
-      showToast("Не вдалося завантажити список доставок", "error"); // 👈 Обробка помилки
+      showToast("Не вдалося завантажити список доставок", "error");
     } finally {
       setLoading(false);
     }
@@ -82,7 +90,6 @@ export const DeliveriesPage = () => {
     setItems([]);
   };
 
-  // Очищення фільтрів
   const clearFilters = () => {
     setFilters({
       fromRegion: "",
@@ -92,35 +99,44 @@ export const DeliveriesPage = () => {
       priority: "" as any,
     });
     setPage(1);
-    showToast("Фільтри скинуто", "info"); // 👈 Інформаційне повідомлення
+    showToast("Фільтри скинуто", "info");
   };
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.action) return;
 
-  // Дії
-  const handleTakeOrder = async (id: number) => {
-    if (!window.confirm("Взяти це замовлення в роботу?")) return;
+    setActionLoading(true);
     try {
-      await requestsApi.takeDelivery(id);
-      showToast("Замовлення успішно взято в роботу! 🚗", "success"); // 👈 Успіх
-      fetchData();
+      await confirmDialog.action();
+      setConfirmDialog({ ...confirmDialog, open: false });
     } catch (e) {
       console.error(e);
-      showToast(
-        "Не вдалося взяти замовлення. Можливо, його вже зайняли.",
-        "error"
-      ); // 👈 Помилка
+    } finally {
+      setActionLoading(false);
     }
   };
+  const handleTakeOrder = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      title: "Взяти це замовлення в роботу?",
+      action: async () => {
+        await requestsApi.takeDelivery(id);
+        showToast("Замовлення успішно взято в роботу! 🚗", "success");
+        fetchData();
+      },
+    });
+  };
 
-  const handleCompleteOrder = async (id: number) => {
-    if (!window.confirm("Підтвердити доставку?")) return;
-    try {
-      await requestsApi.completeDelivery(id);
-      showToast("Доставку завершено! Дякуємо за допомогу 🤝", "success"); // 👈 Успіх
-      fetchData();
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка при завершенні доставки", "error"); // 👈 Помилка
-    }
+  const handleCompleteOrder = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      title: "Завершити доставку?",
+      content: "Підтвердіть, що вантаж успішно передано отримувачу.",
+      action: async () => {
+        await requestsApi.completeDelivery(id);
+        showToast("Доставку завершено! Дякуємо за допомогу 🤝", "success");
+        fetchData();
+      },
+    });
   };
 
   return (
@@ -137,7 +153,6 @@ export const DeliveriesPage = () => {
         </Tabs>
       </Box>
 
-      {/* Панель фільтрів */}
       <Paper variant="outlined" sx={{ mb: 3, bgcolor: "#fafafa" }}>
         <Box
           p={2}
@@ -249,7 +264,6 @@ export const DeliveriesPage = () => {
         </Collapse>
       </Paper>
 
-      {/* Список */}
       {loading ? (
         <Box textAlign="center" py={5}>
           <CircularProgress />
@@ -295,6 +309,14 @@ export const DeliveriesPage = () => {
           )}
         </Stack>
       )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        content={confirmDialog.content}
+        loading={actionLoading}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={handleConfirmAction}
+      />
     </Container>
   );
 };

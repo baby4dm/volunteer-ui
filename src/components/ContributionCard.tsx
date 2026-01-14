@@ -23,16 +23,22 @@ interface Props {
 export const ContributionCard = ({ contrib }: Props) => {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "APPROVED":
+      case "COMPLETED":
         return "success";
+      case "IN_PROGRESS":
+        return "info";
       case "PENDING":
         return "warning";
       case "REJECTED":
+      case "CANCELED":
+      case "FAILED":
         return "error";
       default:
         return "default";
     }
   };
+
+  const statusColor = getStatusColor(contrib.status);
 
   return (
     <Card
@@ -53,10 +59,14 @@ export const ContributionCard = ({ contrib }: Props) => {
           alignItems="center"
         >
           <Chip
-            label={FulfillmentStatusLabels[contrib.status]}
-            color={getStatusColor(contrib.status) as any}
+            label={FulfillmentStatusLabels[contrib.status] || contrib.status}
+            color={statusColor as any}
             size="small"
-            variant={contrib.status === "APPROVED" ? "filled" : "outlined"}
+            variant={
+              contrib.status === "IN_PROGRESS" || contrib.status === "COMPLETED"
+                ? "filled"
+                : "outlined"
+            }
           />
           <Chip
             label={HelpCategoryLabels[contrib.category]}
@@ -86,16 +96,44 @@ export const ContributionCard = ({ contrib }: Props) => {
           variant="outlined"
           sx={{
             p: 1.5,
-            bgcolor: (theme) => alpha(theme.palette.success.main, 0.05),
-            borderColor: (theme) => alpha(theme.palette.success.main, 0.2),
+            bgcolor: (theme) =>
+              statusColor === "default"
+                ? alpha(theme.palette.grey[500], 0.05)
+                : alpha(
+                    theme.palette[
+                      statusColor as "success" | "error" | "warning" | "info"
+                    ].main,
+                    0.05
+                  ),
+            borderColor: (theme) =>
+              statusColor === "default"
+                ? alpha(theme.palette.grey[500], 0.2)
+                : alpha(
+                    theme.palette[
+                      statusColor as "success" | "error" | "warning" | "info"
+                    ].main,
+                    0.2
+                  ),
           }}
         >
           <Box display="flex" alignItems="center" gap={1}>
-            <HandshakeIcon color="success" fontSize="small" />
+            <HandshakeIcon
+              color={
+                statusColor === "default" ? "action" : (statusColor as any)
+              }
+              fontSize="small"
+            />
             <Typography
               variant="subtitle2"
               fontWeight="bold"
-              color="success.main"
+              sx={{
+                color: (theme) =>
+                  statusColor === "default"
+                    ? theme.palette.text.secondary
+                    : theme.palette[
+                        statusColor as "success" | "error" | "warning" | "info"
+                      ].main,
+              }}
             >
               Мій внесок: {contrib.contributionAmount} од.
             </Typography>

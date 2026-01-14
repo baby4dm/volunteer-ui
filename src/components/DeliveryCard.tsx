@@ -43,7 +43,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
 
   const isActive = variant === "ACTIVE";
 
-  // Спільні стилі для кнопок, щоб вони виглядали однаково всюди
   const buttonStyles = {
     textTransform: "none",
     fontWeight: 600,
@@ -71,7 +70,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
       }}
     >
       <CardContent sx={{ p: 2.5 }}>
-        {/* --- HEADER --- */}
         <Box
           display="flex"
           justifyContent="space-between"
@@ -103,7 +101,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
           </Box>
         </Box>
 
-        {/* --- ROUTE --- */}
         <Box
           display="flex"
           alignItems="center"
@@ -111,7 +108,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
           mb={3}
           px={1}
         >
-          {/* Звідки */}
           <Box display="flex" flexDirection="column" gap={0.5} flex={1}>
             <Box
               display="flex"
@@ -137,7 +133,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
             </Typography>
           </Box>
 
-          {/* Стрілка */}
           <Box
             px={2}
             color="primary.main"
@@ -148,7 +143,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
             <ArrowIcon sx={{ fontSize: 30 }} />
           </Box>
 
-          {/* Куди */}
           <Box
             display="flex"
             flexDirection="column"
@@ -187,7 +181,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
           </Box>
         </Box>
 
-        {/* --- DETAILS (Габарити) --- */}
         <Box
           sx={{
             bgcolor: "grey.50",
@@ -240,7 +233,6 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
         </Box>
       </CardContent>
 
-      {/* --- ACTIONS --- */}
       {onAction && variant !== "ARCHIVE" && (
         <CardActions
           sx={{ justifyContent: "flex-end", px: 2.5, pb: 2.5, pt: 0 }}
@@ -252,7 +244,7 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
               disableElevation
               size="medium"
               onClick={() => onAction(item.id)}
-              sx={buttonStyles} // 👈 Застосували стиль
+              sx={buttonStyles}
             >
               Взяти замовлення
             </Button>
@@ -265,7 +257,7 @@ export const DeliveryCard = ({ item, variant, onAction }: Props) => {
               size="medium"
               startIcon={<TruckIcon />}
               onClick={() => onAction(item.id)}
-              sx={buttonStyles} // 👈 Застосували стиль
+              sx={buttonStyles}
             >
               Підтвердити доставку
             </Button>

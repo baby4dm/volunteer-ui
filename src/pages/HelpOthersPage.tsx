@@ -93,7 +93,7 @@ export const HelpOthersPage = () => {
       if (tabValue === 0) {
         const apiFilters: HelpRequestFilter = {
           status: "CREATED" as any,
-          ...(filters.category ? { category: filters.category } : {}), // <--- Фільтр категорії
+          ...(filters.category ? { category: filters.category } : {}),
           ...(filters.region ? { region: filters.region } : {}),
           ...(filters.settlement ? { settlement: filters.settlement } : {}),
           ...(filters.priority ? { priority: filters.priority } : {}),
@@ -104,14 +104,14 @@ export const HelpOthersPage = () => {
         };
         const data = await requestsApi.getAllRequests(apiFilters, page - 1);
         setRequests(data.content);
-        setTotalPages(data.totalPages);
+        setTotalPages(data.page.totalPages);
       } else if (tabValue === 1) {
         const filter: FulfillmentFilter = {
           ...(contributionStatus ? { status: contributionStatus } : {}),
         };
         const data = await requestsApi.getMyContributions(filter, page - 1);
         setContributions(data.content);
-        setTotalPages(data.totalPages);
+        setTotalPages(data.page.totalPages);
       }
     } catch (err) {
       console.error(err);
@@ -168,7 +168,7 @@ export const HelpOthersPage = () => {
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="Потрібна допомога" />
           <Tab label="Я допомагаю" />
-          <Tab label="Мій архів (Скоро)" disabled />
+          <Tab label="Архів" disabled />
         </Tabs>
       </Box>
 

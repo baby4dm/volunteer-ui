@@ -9,7 +9,7 @@ import {
   Avatar,
   Divider,
   Paper,
-  Link, // 👈 Додаємо імпорт Link
+  Link,
 } from "@mui/material";
 import {
   Check as CheckIcon,
@@ -18,7 +18,8 @@ import {
   LocalShipping as ShippingIcon,
   Inventory as AmountIcon,
   Message as MessageIcon,
-  Launch as LaunchIcon, // Іконка для переходу
+  Launch as LaunchIcon,
+  CheckCircle as SuccessIcon,
 } from "@mui/icons-material";
 
 import {
@@ -31,34 +32,45 @@ export const ProposalCard = ({
   prop,
   onApprove,
   onReject,
+  onComplete,
   onRequestClick,
 }: {
   prop: FulfillmentResponse;
   onApprove: (id: number) => void;
   onReject: (id: number) => void;
+  onComplete?: (id: number) => void;
   onRequestClick: (requestId: number) => void;
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "APPROVED":
+      case "COMPLETED":
         return "success";
+      case "IN_PROGRESS":
+        return "info";
       case "PENDING":
         return "warning";
       case "REJECTED":
+      case "CANCELED":
+      case "FAILED":
         return "error";
       default:
         return "default";
     }
   };
 
+  const isPending = prop.status === "PENDING";
+  const isInProgress = prop.status === "IN_PROGRESS";
   return (
     <Card
       sx={{
         width: "100%",
         borderRadius: 2,
         boxShadow: 1,
-        borderLeft:
-          prop.status === "PENDING" ? "4px solid #ed6c02" : "1px solid #e0e0e0",
+        borderLeft: isPending
+          ? "4px solid #ed6c02"
+          : isInProgress
+          ? "4px solid #0288d1"
+          : "1px solid #e0e0e0",
       }}
     >
       <CardContent sx={{ p: 2 }}>
@@ -114,7 +126,11 @@ export const ProposalCard = ({
             label={FulfillmentStatusLabels[prop.status]}
             color={getStatusColor(prop.status) as any}
             size="small"
-            variant={prop.status === "APPROVED" ? "filled" : "outlined"}
+            variant={
+              isInProgress || prop.status === "COMPLETED"
+                ? "filled"
+                : "outlined"
+            }
           />
         </Box>
 
@@ -169,25 +185,41 @@ export const ProposalCard = ({
         </Box>
       </CardContent>
 
-      {prop.status === "PENDING" && (
+      {(isPending || (isInProgress && onComplete)) && (
         <CardActions sx={{ justifyContent: "flex-end", px: 2, pb: 2, pt: 0 }}>
-          <Button
-            size="small"
-            color="error"
-            startIcon={<CloseIcon />}
-            onClick={() => onReject(prop.id)}
-          >
-            Відхилити
-          </Button>
-          <Button
-            variant="contained"
-            size="small"
-            color="success"
-            startIcon={<CheckIcon />}
-            onClick={() => onApprove(prop.id)}
-          >
-            Прийняти
-          </Button>
+          {isPending && (
+            <>
+              <Button
+                size="small"
+                color="error"
+                startIcon={<CloseIcon />}
+                onClick={() => onReject(prop.id)}
+              >
+                Відхилити
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                color="success"
+                startIcon={<CheckIcon />}
+                onClick={() => onApprove(prop.id)}
+              >
+                Прийняти
+              </Button>
+            </>
+          )}
+
+          {isInProgress && onComplete && (
+            <Button
+              variant="contained"
+              size="small"
+              color="info"
+              startIcon={<SuccessIcon />}
+              onClick={() => onComplete(prop.id)}
+            >
+              Підтвердити отримання
+            </Button>
+          )}
         </CardActions>
       )}
     </Card>
