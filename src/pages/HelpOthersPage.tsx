@@ -27,13 +27,13 @@ import type {
   VolunteerContributionResponse,
   FulfillmentFilter,
   DeliveryType,
+  FulfillmentStatus,
 } from "../types";
 
 import {
   RequestPriorityLabels,
   HelpCategoryLabels,
   FulfillmentStatusLabels,
-  type FulfillmentStatus,
 } from "../types";
 
 import { requestsApi } from "../api/requestsApi";
@@ -75,21 +75,19 @@ export const HelpOthersPage = () => {
     isUrgent: false,
   });
 
-  const [contributionStatus, setContributionStatus] = useState<
-    FulfillmentStatus | ""
-  >("");
-
   const handleTabChange = (_: any, newValue: number) => {
     setTabValue(newValue);
     setPage(1);
     setSearchQuery("");
     setRequests([]);
     setContributions([]);
+    setShowFilters(false);
   };
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      // --- Вкладка 0: Потрібна допомога (Всі активні запити) ---
       if (tabValue === 0) {
         const apiFilters: HelpRequestFilter = {
           status: "CREATED" as any,
@@ -105,13 +103,58 @@ export const HelpOthersPage = () => {
         const data = await requestsApi.getAllRequests(apiFilters, page - 1);
         setRequests(data.content);
         setTotalPages(data.page.totalPages);
-      } else if (tabValue === 1) {
-        const filter: FulfillmentFilter = {
-          ...(contributionStatus ? { status: contributionStatus } : {}),
-        };
-        const data = await requestsApi.getMyContributions(filter, page - 1);
-        setContributions(data.content);
-        setTotalPages(data.page.totalPages);
+      }
+
+      // --- Вкладка 1: Я допомагаю (Тільки активні: PENDING + IN_PROGRESS) ---
+      else if (tabValue === 1) {
+        const [pendingData, inProgressData] = await Promise.all([
+          requestsApi.getMyContributions({ status: "PENDING" }, page - 1),
+          requestsApi.getMyContributions({ status: "IN_PROGRESS" }, page - 1),
+        ]);
+
+        const combined = [
+          ...pendingData.content,
+          ...inProgressData.content,
+        ].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        setContributions(combined);
+        setTotalPages(
+          Math.max(pendingData.page.totalPages, inProgressData.page.totalPages)
+        );
+      }
+
+      // --- Вкладка 2: Архів (Тільки завершені: COMPLETED, REJECTED, CANCELED) ---
+      else if (tabValue === 2) {
+        // Список статусів для архіву (прибрав FAILED, бо його немає у вас в типах)
+        const statuses: FulfillmentStatus[] = [
+          "COMPLETED",
+          "REJECTED",
+          "CANCELED",
+        ];
+
+        const promises = statuses.map((status) =>
+          requestsApi.getMyContributions({ status }, page - 1)
+        );
+
+        const results = await Promise.all(promises);
+
+        const combined = results
+          .flatMap((res) => res.content)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+
+        setContributions(combined);
+
+        const maxPages =
+          results.length > 0
+            ? Math.max(...results.map((r) => r.page.totalPages))
+            : 0;
+        setTotalPages(maxPages);
       }
     } catch (err) {
       console.error(err);
@@ -122,7 +165,7 @@ export const HelpOthersPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [tabValue, page, filters, contributionStatus]);
+  }, [tabValue, page, filters]);
 
   const getFilteredData = () => {
     if (tabValue === 0)
@@ -136,10 +179,12 @@ export const HelpOthersPage = () => {
   };
 
   const displayData = getFilteredData();
+
+  // Фільтри показуємо тільки для першої вкладки
   const hasActiveFilters =
     tabValue === 0
       ? Object.values(filters).some(Boolean) || searchQuery
-      : !!contributionStatus || searchQuery;
+      : searchQuery;
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -153,8 +198,6 @@ export const HelpOthersPage = () => {
         deliveryType: "" as any,
         isUrgent: false,
       });
-    } else {
-      setContributionStatus("");
     }
   };
 
@@ -168,7 +211,7 @@ export const HelpOthersPage = () => {
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="Потрібна допомога" />
           <Tab label="Я допомагаю" />
-          <Tab label="Архів" disabled />
+          <Tab label="Архів" />
         </Tabs>
       </Box>
 
@@ -214,6 +257,7 @@ export const HelpOthersPage = () => {
                 sx={{ bgcolor: "white" }}
               />
 
+              {/* Фільтри відображаються тільки для вкладки "Потрібна допомога" */}
               {tabValue === 0 && (
                 <>
                   <TextField
@@ -295,23 +339,6 @@ export const HelpOthersPage = () => {
                     label="Тільки термінові"
                   />
                 </>
-              )}
-
-              {tabValue === 1 && (
-                <TextField
-                  select
-                  label="Статус моєї допомоги"
-                  size="small"
-                  value={contributionStatus}
-                  onChange={(e) => setContributionStatus(e.target.value as any)}
-                >
-                  <MenuItem value="">Всі статуси</MenuItem>
-                  {Object.entries(FulfillmentStatusLabels).map(([k, v]) => (
-                    <MenuItem key={k} value={k}>
-                      {v}
-                    </MenuItem>
-                  ))}
-                </TextField>
               )}
             </Stack>
           </Box>
