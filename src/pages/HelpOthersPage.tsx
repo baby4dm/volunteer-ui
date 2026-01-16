@@ -25,16 +25,11 @@ import type {
   HelpRequestPreviewResponse,
   HelpRequestFilter,
   VolunteerContributionResponse,
-  FulfillmentFilter,
   DeliveryType,
   FulfillmentStatus,
 } from "../types";
 
-import {
-  RequestPriorityLabels,
-  HelpCategoryLabels,
-  FulfillmentStatusLabels,
-} from "../types";
+import { RequestPriorityLabels, HelpCategoryLabels } from "../types";
 
 import { requestsApi } from "../api/requestsApi";
 import { RequestDetailsModal } from "../components/RequestDetailsModal";
@@ -87,10 +82,9 @@ export const HelpOthersPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // --- Вкладка 0: Потрібна допомога (Всі активні запити) ---
+      // --- Вкладка 0: Потрібна допомога (CREATED + IN_PROGRESS) ---
       if (tabValue === 0) {
-        const apiFilters: HelpRequestFilter = {
-          status: "CREATED" as any,
+        const baseFilters = {
           ...(filters.category ? { category: filters.category } : {}),
           ...(filters.region ? { region: filters.region } : {}),
           ...(filters.settlement ? { settlement: filters.settlement } : {}),
@@ -100,12 +94,35 @@ export const HelpOthersPage = () => {
             : {}),
           ...(filters.isUrgent ? { isUrgent: true } : {}),
         };
-        const data = await requestsApi.getAllRequests(apiFilters, page - 1);
-        setRequests(data.content);
-        setTotalPages(data.page.totalPages);
+
+        // Запитуємо обидва статуси паралельно
+        const [createdData, inProgressData] = await Promise.all([
+          requestsApi.getAllRequests(
+            { ...baseFilters, status: "CREATED" as any },
+            page - 1
+          ),
+          requestsApi.getAllRequests(
+            { ...baseFilters, status: "IN_PROGRESS" as any },
+            page - 1
+          ),
+        ]);
+
+        const combinedContent = [
+          ...createdData.content,
+          ...inProgressData.content,
+        ];
+
+        // Сортуємо: спочатку за датою створення (якщо є), інакше за ID
+
+        setRequests(combinedContent);
+
+        // Для пагінації беремо максимальну кількість сторінок з двох запитів
+        setTotalPages(
+          Math.max(createdData.page.totalPages, inProgressData.page.totalPages)
+        );
       }
 
-      // --- Вкладка 1: Я допомагаю (Тільки активні: PENDING + IN_PROGRESS) ---
+      // --- Вкладка 1: Я допомагаю (PENDING + IN_PROGRESS) ---
       else if (tabValue === 1) {
         const [pendingData, inProgressData] = await Promise.all([
           requestsApi.getMyContributions({ status: "PENDING" }, page - 1),
@@ -126,9 +143,8 @@ export const HelpOthersPage = () => {
         );
       }
 
-      // --- Вкладка 2: Архів (Тільки завершені: COMPLETED, REJECTED, CANCELED) ---
+      // --- Вкладка 2: Архів (COMPLETED, REJECTED, CANCELED) ---
       else if (tabValue === 2) {
-        // Список статусів для архіву (прибрав FAILED, бо його немає у вас в типах)
         const statuses: FulfillmentStatus[] = [
           "COMPLETED",
           "REJECTED",
@@ -180,7 +196,6 @@ export const HelpOthersPage = () => {
 
   const displayData = getFilteredData();
 
-  // Фільтри показуємо тільки для першої вкладки
   const hasActiveFilters =
     tabValue === 0
       ? Object.values(filters).some(Boolean) || searchQuery
@@ -257,7 +272,6 @@ export const HelpOthersPage = () => {
                 sx={{ bgcolor: "white" }}
               />
 
-              {/* Фільтри відображаються тільки для вкладки "Потрібна допомога" */}
               {tabValue === 0 && (
                 <>
                   <TextField

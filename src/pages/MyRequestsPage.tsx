@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -45,6 +45,17 @@ import { RequestCard } from "../components/RequestCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useToast } from "../context/ToastContext";
 
+// Словник перекладу статусів
+const STATUS_TRANSLATIONS: Record<string, string> = {
+  CREATED: "Створено",
+  PENDING: "Очікує підтвердження",
+  IN_PROGRESS: "В роботі",
+  COMPLETED: "Завершено",
+  REJECTED: "Відхилено",
+  CANCELED: "Скасовано",
+  FAILED: "Не вдалося",
+};
+
 export const MyRequestsPage = () => {
   const { showToast } = useToast();
   const [tabValue, setTabValue] = useState(0);
@@ -57,7 +68,6 @@ export const MyRequestsPage = () => {
 
   const [showFilters, setShowFilters] = useState(false);
 
-  // Стейт даних
   const [requests, setRequests] = useState<HelpRequestPreviewResponse[]>([]);
   const [proposals, setProposals] = useState<FulfillmentResponse[]>([]);
 
@@ -119,7 +129,6 @@ export const MyRequestsPage = () => {
     showToast("Фільтри скинуто", "info");
   };
 
-  // --- Actions ---
   const handleApproveProposal = async (id: number) => {
     try {
       await requestsApi.approveProposal(id);
@@ -185,14 +194,30 @@ export const MyRequestsPage = () => {
     });
   };
 
+  // --- Helpers ---
+  const getUniqueItems = <T extends { id: number; createdAt?: string }>(
+    items: T[]
+  ): T[] => {
+    const map = new Map();
+    items.forEach((item) => map.set(item.id, item));
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.createdAt && b.createdAt) {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+      return b.id - a.id;
+    });
+  };
+
   // --- Data Fetching ---
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setRequests([]);
     setProposals([]);
 
     try {
-      // 0. АКТИВНІ ЗАПИТИ (Я створив)
+      // 0. АКТИВНІ ЗАПИТИ
       if (tabValue === 0) {
         const baseFilters = {
           ...(filters.category ? { category: filters.category } : {}),
@@ -216,20 +241,19 @@ export const MyRequestsPage = () => {
           ),
         ]);
 
-        const combinedContent = [
+        const combined = getUniqueItems([
           ...dataCreated.content,
           ...dataInProgress.content,
-        ];
-
-        setRequests(combinedContent);
+        ]);
+        setRequests(combined);
         setTotalPages(
           Math.max(dataCreated.page.totalPages, dataInProgress.page.totalPages)
         );
       }
 
-      // 1. АРХІВ (Все завершене)
+      // 1. АРХІВ
       else if (tabValue === 1) {
-        // --- 1.1 Мої запити (Тільки COMPLETED) ---
+        // Запити
         const reqData = await requestsApi.getMyRequests(
           {
             status: "COMPLETED" as any,
@@ -239,66 +263,29 @@ export const MyRequestsPage = () => {
         );
         setRequests(reqData.content);
 
-        // --- 1.2 Мої пропозиції (COMPLETED, REJECTED, CANCELED) ---
-        // Завантажуємо всі архівні статуси
-        const [completedProps, rejectedProps, canceledProps] =
-          await Promise.all([
-            requestsApi.getMyProposals(
-              { status: "COMPLETED" } as any,
-              page - 1
-            ),
-            requestsApi.getMyProposals({ status: "REJECTED" } as any, page - 1),
-            requestsApi.getMyProposals({ status: "CANCELED" } as any, page - 1),
-          ]);
+        // Пропозиції
+        const propData = await requestsApi.getMyProposals(page - 1);
 
-        // Об'єднуємо їх в один масив
-        const combinedProposals = [
-          ...completedProps.content,
-          ...rejectedProps.content,
-          ...canceledProps.content,
-        ]
-          // Про всяк випадок фільтруємо, щоб бути певними, що тут тільки архів
-          .filter((p) =>
-            ["COMPLETED", "REJECTED", "CANCELED"].includes(p.status)
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-
-        setProposals(combinedProposals);
-
-        const maxPages = Math.max(
-          reqData.page.totalPages,
-          completedProps.page.totalPages,
-          rejectedProps.page.totalPages,
-          canceledProps.page.totalPages
+        const archivedProps = propData.content.filter((p) =>
+          ["COMPLETED", "REJECTED", "CANCELED"].includes(p.status)
         );
-        setTotalPages(maxPages);
+
+        setProposals(getUniqueItems(archivedProps));
+        setTotalPages(
+          Math.max(reqData.page.totalPages, propData.page.totalPages)
+        );
       }
 
-      // 2. АКТИВНІ ПРОПОЗИЦІЇ (Я допомагаю)
+      // 2. АКТИВНІ ПРОПОЗИЦІЇ
       else if (tabValue === 2) {
-        const [pendingData, inProgressData] = await Promise.all([
-          requestsApi.getMyProposals({ status: "PENDING" } as any, page - 1),
-          requestsApi.getMyProposals(
-            { status: "IN_PROGRESS" } as any,
-            page - 1
-          ),
-        ]);
+        const propData = await requestsApi.getMyProposals(page - 1);
 
-        const combined = [...pendingData.content, ...inProgressData.content]
-          // Жорсткий фільтр: тут ТІЛЬКИ активні. Відхилені сюди не пройдуть.
-          .filter((p) => ["PENDING", "IN_PROGRESS"].includes(p.status))
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-
-        setProposals(combined);
-        setTotalPages(
-          Math.max(pendingData.page.totalPages, inProgressData.page.totalPages)
+        const activeProps = propData.content.filter((p) =>
+          ["PENDING", "IN_PROGRESS"].includes(p.status)
         );
+
+        setProposals(getUniqueItems(activeProps));
+        setTotalPages(propData.page.totalPages);
       }
     } catch (err) {
       console.error(err);
@@ -306,27 +293,24 @@ export const MyRequestsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tabValue, page, filters, showToast]);
 
   useEffect(() => {
     fetchData();
-  }, [tabValue, page, filters]);
+  }, [fetchData]);
 
   const handleOpenDetails = (id: number) => setSelectedRequestId(id);
   const handleCloseDetails = () => setSelectedRequestId(null);
 
-  // --- Фільтрація (Пошук) ---
   const getFilteredData = () => {
     const lowerQuery = searchQuery.toLowerCase();
 
-    // Для вкладки Активні та Архів
     const filteredRequests = requests.filter((req) =>
       req.title.toLowerCase().includes(lowerQuery)
     );
 
-    // Для вкладки Пропозиції та Архів
     const filteredProposals = proposals.filter((prop) =>
-      prop.requestTitle.toLowerCase().includes(lowerQuery)
+      (prop.requestTitle || "").toLowerCase().includes(lowerQuery)
     );
 
     return { filteredRequests, filteredProposals };
@@ -340,8 +324,7 @@ export const MyRequestsPage = () => {
     filters.settlement ||
     filters.priority ||
     filters.deliveryType ||
-    filters.isUrgent ||
-    searchQuery;
+    filters.isUrgent;
 
   return (
     <Container maxWidth="md" sx={{ pb: 4, mt: 2 }}>
@@ -393,7 +376,7 @@ export const MyRequestsPage = () => {
             <Typography variant="subtitle2">Фільтри та пошук</Typography>
             {hasActiveFilters && (
               <Chip
-                label="Активні"
+                label="Фільтри"
                 size="small"
                 color="primary"
                 sx={{ height: 20 }}
@@ -401,7 +384,7 @@ export const MyRequestsPage = () => {
             )}
           </Box>
 
-          {hasActiveFilters && (
+          {(hasActiveFilters || searchQuery) && (
             <Button
               startIcon={<ClearIcon />}
               size="small"
@@ -431,113 +414,118 @@ export const MyRequestsPage = () => {
                 sx={{ bgcolor: "white" }}
               />
 
-              {/* Фільтри показуємо лише для вкладки "Активні" (0) */}
               {tabValue === 0 && (
                 <>
-                  <TextField
-                    fullWidth
-                    label="Місто / Село"
-                    size="small"
-                    value={filters.settlement}
-                    onChange={(e) =>
-                      handleFilterChange("settlement", e.target.value)
-                    }
-                  />
-
-                  <TextField
-                    select
-                    fullWidth
-                    label="Область"
-                    size="small"
-                    value={filters.region}
-                    onChange={(e) =>
-                      handleFilterChange("region", e.target.value)
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>Всі області</em>
-                    </MenuItem>
-                    {UKRAINE_REGIONS.map((region) => (
-                      <MenuItem key={region} value={region}>
-                        {region}
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      fullWidth
+                      label="Місто / Село"
+                      size="small"
+                      value={filters.settlement}
+                      onChange={(e) =>
+                        handleFilterChange("settlement", e.target.value)
+                      }
+                    />
+                    <TextField
+                      select
+                      fullWidth
+                      label="Область"
+                      size="small"
+                      value={filters.region}
+                      onChange={(e) =>
+                        handleFilterChange("region", e.target.value)
+                      }
+                    >
+                      <MenuItem value="">
+                        <em>Всі області</em>
                       </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <TextField
-                    select
-                    fullWidth
-                    label="Категорія"
-                    size="small"
-                    value={filters.category}
-                    onChange={(e) =>
-                      handleFilterChange("category", e.target.value)
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>Всі категорії</em>
-                    </MenuItem>
-                    {Object.entries(HelpCategoryLabels).map(([key, label]) => (
-                      <MenuItem key={key} value={key}>
-                        {label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <TextField
-                    select
-                    fullWidth
-                    label="Пріоритет"
-                    size="small"
-                    value={filters.priority}
-                    onChange={(e) =>
-                      handleFilterChange("priority", e.target.value)
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>Будь-який</em>
-                    </MenuItem>
-                    {Object.entries(RequestPriorityLabels).map(
-                      ([key, label]) => (
-                        <MenuItem key={key} value={key}>
-                          {label}
+                      {UKRAINE_REGIONS.map((r) => (
+                        <MenuItem key={r} value={r}>
+                          {r}
                         </MenuItem>
-                      )
-                    )}
-                  </TextField>
+                      ))}
+                    </TextField>
+                  </Stack>
 
-                  <TextField
-                    select
-                    fullWidth
-                    label="Тип доставки"
-                    size="small"
-                    value={filters.deliveryType}
-                    onChange={(e) =>
-                      handleFilterChange("deliveryType", e.target.value)
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>Будь-який</em>
-                    </MenuItem>
-                    {Object.entries(DeliveryTypeLabels).map(([key, label]) => (
-                      <MenuItem key={key} value={key}>
-                        {label}
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Категорія"
+                      size="small"
+                      value={filters.category}
+                      onChange={(e) =>
+                        handleFilterChange("category", e.target.value)
+                      }
+                    >
+                      <MenuItem value="">
+                        <em>Всі категорії</em>
                       </MenuItem>
-                    ))}
-                  </TextField>
+                      {Object.entries(HelpCategoryLabels).map(([k, v]) => (
+                        <MenuItem key={k} value={k}>
+                          {v}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Пріоритет"
+                      size="small"
+                      value={filters.priority}
+                      onChange={(e) =>
+                        handleFilterChange("priority", e.target.value)
+                      }
+                    >
+                      <MenuItem value="">
+                        <em>Будь-який</em>
+                      </MenuItem>
+                      {Object.entries(RequestPriorityLabels).map(([k, v]) => (
+                        <MenuItem key={k} value={k}>
+                          {v}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Stack>
 
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={filters.isUrgent || false}
-                        onChange={(e) =>
-                          handleFilterChange("isUrgent", e.target.checked)
-                        }
-                        color="error"
-                      />
-                    }
-                    label="Тільки термінові"
-                  />
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <TextField
+                      select
+                      sx={{ width: "50%" }}
+                      label="Тип доставки"
+                      size="small"
+                      value={filters.deliveryType}
+                      onChange={(e) =>
+                        handleFilterChange("deliveryType", e.target.value)
+                      }
+                    >
+                      <MenuItem value="">
+                        <em>Будь-який</em>
+                      </MenuItem>
+                      {Object.entries(DeliveryTypeLabels).map(([k, v]) => (
+                        <MenuItem key={k} value={k}>
+                          {v}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={filters.isUrgent || false}
+                          onChange={(e) =>
+                            handleFilterChange("isUrgent", e.target.checked)
+                          }
+                          color="error"
+                        />
+                      }
+                      label="Тільки термінові"
+                    />
+                  </Stack>
                 </>
               )}
             </Stack>
@@ -566,33 +554,52 @@ export const MyRequestsPage = () => {
           {/* --- Вкладка 1: АРХІВ --- */}
           {tabValue === 1 && (
             <>
-              {/* Завершені запити */}
+              {/* Реальні запити */}
               {filteredRequests.map((req) => (
                 <RequestCard
                   key={`req-${req.id}`}
                   req={req}
                   onDelete={handleDeleteRequest}
                   onClick={handleOpenDetails}
-                  // В архіві кнопка завершення не потрібна
                 />
               ))}
 
-              {/* Пропозиції: Завершені, Відхилені, Скасовані */}
-              {filteredProposals.map((prop) => (
-                <ProposalCard
-                  key={`prop-${prop.id}`}
-                  prop={prop}
-                  // Всі Actions передаємо пустими або null, щоб картка була "як завершена"
-                  onApprove={async () => {}}
-                  onReject={() => {}}
-                  onRequestClick={handleOpenDetails}
-                  onComplete={() => {}}
-                />
-              ))}
+              {/* Пропозиції (замасковані під RequestCard) */}
+              {filteredProposals.map((prop) => {
+                const isCompleted = prop.status === "COMPLETED";
+                const uaStatus =
+                  STATUS_TRANSLATIONS[prop.status] || prop.status;
+
+                return (
+                  <RequestCard
+                    key={`prop-${prop.id}`}
+                    req={{
+                      id: prop.requestId,
+                      title: prop.requestTitle,
+                      category: "OTHER" as any,
+                      // Адреса: відображаємо, щоб не ламати верстку
+                      region: "Україна",
+                      settlement: "За запитом",
+                      priority: "MEDIUM" as any,
+                      deliveryType: prop.deliveryType,
+                      validUntil: new Date().toISOString(),
+
+                      // Прогрес: 0 якщо не завершено
+                      amount: isCompleted ? prop.amount : 0,
+                      receivedAmount: isCompleted ? prop.amount : 0,
+
+                      // Статус: перекладений українською
+                      status: uaStatus as any,
+                    }}
+                    onDelete={undefined as any}
+                    onClick={handleOpenDetails}
+                  />
+                );
+              })}
             </>
           )}
 
-          {/* --- Вкладка 2: АКТИВНІ ПРОПОЗИЦІЇ (Pending / In Progress) --- */}
+          {/* --- Вкладка 2: АКТИВНІ ПРОПОЗИЦІЇ --- */}
           {tabValue === 2 &&
             filteredProposals.map((prop) => (
               <ProposalCard
@@ -626,6 +633,7 @@ export const MyRequestsPage = () => {
             </Typography>
           )}
 
+          {/* Пагінація */}
           {totalPages > 1 && (
             <Box display="flex" justifyContent="center" mt={2}>
               <Pagination
@@ -633,6 +641,7 @@ export const MyRequestsPage = () => {
                 page={page}
                 onChange={(_, v) => setPage(v)}
                 color="primary"
+                shape="rounded"
               />
             </Box>
           )}
