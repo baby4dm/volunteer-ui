@@ -74,7 +74,7 @@ export const RegisterPage = () => {
       className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 py-10"
       style={{ backgroundImage: `url(${BACKGROUND_IMAGE_URL})` }}
     >
-      <div className="absolute inset-0 bg-black/50 z-0"></div>
+      <div className="fixed inset-0 bg-black/50 z-0"></div>
 
       <div className="w-full max-w-md z-10 flex flex-col items-center">
         <Logo variant="light" className="mb-8" />

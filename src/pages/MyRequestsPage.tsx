@@ -45,7 +45,6 @@ import { RequestCard } from "../components/RequestCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useToast } from "../context/ToastContext";
 
-// Словник перекладу статусів
 const STATUS_TRANSLATIONS: Record<string, string> = {
   CREATED: "Створено",
   PENDING: "Очікує підтвердження",
@@ -210,14 +209,12 @@ export const MyRequestsPage = () => {
     });
   };
 
-  // --- Data Fetching ---
   const fetchData = useCallback(async () => {
     setLoading(true);
     setRequests([]);
     setProposals([]);
 
     try {
-      // 0. АКТИВНІ ЗАПИТИ
       if (tabValue === 0) {
         const baseFilters = {
           ...(filters.category ? { category: filters.category } : {}),
@@ -249,11 +246,7 @@ export const MyRequestsPage = () => {
         setTotalPages(
           Math.max(dataCreated.page.totalPages, dataInProgress.page.totalPages)
         );
-      }
-
-      // 1. АРХІВ
-      else if (tabValue === 1) {
-        // Запити
+      } else if (tabValue === 1) {
         const reqData = await requestsApi.getMyRequests(
           {
             status: "COMPLETED" as any,
@@ -263,21 +256,28 @@ export const MyRequestsPage = () => {
         );
         setRequests(reqData.content);
 
-        // Пропозиції
+        const myRequestIds = new Set(reqData.content.map((r) => r.id));
+
         const propData = await requestsApi.getMyProposals(page - 1);
 
-        const archivedProps = propData.content.filter((p) =>
-          ["COMPLETED", "REJECTED", "CANCELED"].includes(p.status)
-        );
+        const archivedProps = propData.content.filter((p) => {
+          if (["REJECTED", "CANCELED"].includes(p.status)) {
+            return true;
+          }
+
+          if (p.status === "COMPLETED") {
+            return !myRequestIds.has(p.requestId);
+          }
+
+          return false;
+        });
 
         setProposals(getUniqueItems(archivedProps));
+
         setTotalPages(
           Math.max(reqData.page.totalPages, propData.page.totalPages)
         );
-      }
-
-      // 2. АКТИВНІ ПРОПОЗИЦІЇ
-      else if (tabValue === 2) {
+      } else if (tabValue === 2) {
         const propData = await requestsApi.getMyProposals(page - 1);
 
         const activeProps = propData.content.filter((p) =>
@@ -539,7 +539,6 @@ export const MyRequestsPage = () => {
         </Box>
       ) : (
         <Stack spacing={2}>
-          {/* --- Вкладка 0: АКТИВНІ ЗАПИТИ --- */}
           {tabValue === 0 &&
             filteredRequests.map((req) => (
               <RequestCard
@@ -551,10 +550,8 @@ export const MyRequestsPage = () => {
               />
             ))}
 
-          {/* --- Вкладка 1: АРХІВ --- */}
           {tabValue === 1 && (
             <>
-              {/* Реальні запити */}
               {filteredRequests.map((req) => (
                 <RequestCard
                   key={`req-${req.id}`}
@@ -564,7 +561,6 @@ export const MyRequestsPage = () => {
                 />
               ))}
 
-              {/* Пропозиції (замасковані під RequestCard) */}
               {filteredProposals.map((prop) => {
                 const isCompleted = prop.status === "COMPLETED";
                 const uaStatus =
@@ -577,18 +573,14 @@ export const MyRequestsPage = () => {
                       id: prop.requestId,
                       title: prop.requestTitle,
                       category: "OTHER" as any,
-                      // Адреса: відображаємо, щоб не ламати верстку
                       region: "Україна",
                       settlement: "За запитом",
                       priority: "MEDIUM" as any,
                       deliveryType: prop.deliveryType,
                       validUntil: new Date().toISOString(),
 
-                      // Прогрес: 0 якщо не завершено
                       amount: isCompleted ? prop.amount : 0,
                       receivedAmount: isCompleted ? prop.amount : 0,
-
-                      // Статус: перекладений українською
                       status: uaStatus as any,
                     }}
                     onDelete={undefined as any}
@@ -599,7 +591,6 @@ export const MyRequestsPage = () => {
             </>
           )}
 
-          {/* --- Вкладка 2: АКТИВНІ ПРОПОЗИЦІЇ --- */}
           {tabValue === 2 &&
             filteredProposals.map((prop) => (
               <ProposalCard
@@ -612,7 +603,6 @@ export const MyRequestsPage = () => {
               />
             ))}
 
-          {/* Empty States */}
           {tabValue === 0 && filteredRequests.length === 0 && (
             <Typography textAlign="center" color="text.secondary">
               Активних запитів не знайдено
@@ -633,7 +623,6 @@ export const MyRequestsPage = () => {
             </Typography>
           )}
 
-          {/* Пагінація */}
           {totalPages > 1 && (
             <Box display="flex" justifyContent="center" mt={2}>
               <Pagination
